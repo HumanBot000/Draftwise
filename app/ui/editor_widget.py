@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QTextEdit, QFrame
-from PySide6.QtGui import QTextDocument, QFont, QTextCursor, QAction, QColor, QTextCharFormat, QTextBlockFormat, QPageSize
-from PySide6.QtCore import Qt, Signal, QTimer
+from PySide6.QtGui import QFont, QTextCursor, QColor, QTextCharFormat
+from PySide6.QtCore import Qt, Signal
 
 class EditorWidget(QWidget):
     content_changed = Signal()
@@ -8,45 +8,26 @@ class EditorWidget(QWidget):
     def __init__(self, file_path=None, parent=None):
         super().__init__(parent)
         self.file_path = file_path
+        self.is_modified = False
+
         self.layout = QVBoxLayout(self)
-        self.layout.setContentsMargins(0, 0, 0, 0)
+        # Center the editor with margins, creating a "page" effect
+        self.layout.setContentsMargins(50, 20, 50, 20)
         self.layout.setSpacing(0)
 
-        # Editor Area (The "Page")
+        # Editor
         self.editor = QTextEdit()
         self.editor.setFrameShape(QFrame.NoFrame)
-        self.editor.setAcceptRichText(True)
+        self.editor.setObjectName("Editor") # For specific styling
         
-        # Simulate A4 Page feel
-        # A4 width is approx 210mm. At 96 DPI -> ~794px.
-        # We add some padding for comfort.
-        self.editor.setStyleSheet("""
-            QTextEdit {
-                background-color: white; 
-                color: black;
-                padding: 40px;
-                font-family: 'Calibri', 'Arial', sans-serif;
-                font-size: 14px;
-                selection-background-color: #B3D7FF;
-            }
-        """)
-
         # Set default font
         font = QFont("Calibri", 12)
         self.editor.setFont(font)
         
         self.layout.addWidget(self.editor)
 
-        # Connect signals
+        # --- Connections ---
         self.editor.textChanged.connect(self.on_text_changed)
-
-        # Auto-save setup
-        self.autosave_timer = QTimer(self)
-        self.autosave_timer.setInterval(5000) # Autosave every 5 seconds
-        self.autosave_timer.timeout.connect(self.autosave)
-        self.autosave_timer.start()
-        
-        self.is_modified = False
 
     def on_text_changed(self):
         self.is_modified = True
@@ -65,48 +46,41 @@ class EditorWidget(QWidget):
     def get_content_plain(self):
         return self.editor.toPlainText()
 
-    def autosave(self):
-        if self.is_modified and self.file_path:
-            # Emit a signal or call a service to save
-            # For simplicity in this demo, we print.
-            # In a real app, we'd call a controller method.
-            print(f"Auto-saving {self.file_path}...")
-            # We don't implement actual file writing here to keep UI decoupled from IO logic.
-            # The controller should handle the actual save call.
-            pass
-
-    # Formatting Methods
+    # --- Formatting Methods ---
     def toggle_bold(self):
-        fmt = QTextCharFormat()
-        fmt.setFontWeight(QFont.Bold if self.editor.fontWeight() != QFont.Bold else QFont.Normal)
-        self.merge_format_on_word_or_selection(fmt)
+        self.editor.setFontWeight(QFont.Bold if self.editor.fontWeight() != QFont.Bold else QFont.Normal)
 
     def toggle_italic(self):
-        fmt = QTextCharFormat()
-        fmt.setFontItalic(not self.editor.fontItalic())
-        self.merge_format_on_word_or_selection(fmt)
+        self.editor.setFontItalic(not self.editor.fontItalic())
 
     def toggle_underline(self):
-        fmt = QTextCharFormat()
-        fmt.setFontUnderline(not self.editor.fontUnderline())
-        self.merge_format_on_word_or_selection(fmt)
+        self.editor.setFontUnderline(not self.editor.fontUnderline())
         
     def set_alignment(self, alignment):
         self.editor.setAlignment(alignment)
 
     def set_text_color(self, color):
-        fmt = QTextCharFormat()
-        fmt.setForeground(color)
-        self.merge_format_on_word_or_selection(fmt)
+        self.editor.setTextColor(color)
         
-    def set_highlight_color(self, color):
+    def set_font_family(self, font_family):
         fmt = QTextCharFormat()
-        fmt.setBackground(color)
+        fmt.setFontFamilies([font_family])
         self.merge_format_on_word_or_selection(fmt)
 
-    def merge_format_on_word_or_selection(self, format):
+    def set_font_size(self, size):
+        fmt = QTextCharFormat()
+        fmt.setFontPointSize(size)
+        self.merge_format_on_word_or_selection(fmt)
+
+    def merge_format_on_word_or_selection(self, format_to_merge):
         cursor = self.editor.textCursor()
         if not cursor.hasSelection():
             cursor.select(QTextCursor.WordUnderCursor)
-        cursor.mergeCharFormat(format)
-        self.editor.mergeCurrentCharFormat(format)
+        
+        # We need to merge, not replace the format
+        current_format = cursor.charFormat()
+        current_format.merge(format_to_merge)
+        cursor.setCharFormat(current_format)
+        
+        # This ensures the new format is applied to subsequent typing
+        self.editor.setCurrentCharFormat(current_format)

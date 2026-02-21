@@ -4,3 +4,9 @@ PyMuPDF
 markdown
 reportlab
 qtawesome
+
+scholarly
+
+requests
+
+qt-material
